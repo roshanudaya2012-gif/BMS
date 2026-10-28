@@ -28,13 +28,13 @@ button:focus-visible{outline:2px solid var(--soc);outline-offset:2px}
 .pane{display:none}.pane.on{display:block}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px;margin-bottom:14px}
 .card h2{font-size:14px;margin:0 0 12px;font-weight:600;color:var(--mute)}
-.hero{display:grid;grid-template-columns:200px 1fr;gap:20px;align-items:center}
-.gauge{position:relative;width:180px;height:180px;justify-self:center}
+.hero{display:grid;grid-template-columns:150px 150px 1fr;gap:20px;align-items:center}
+.gauge{position:relative;width:150px;height:150px;justify-self:center}
 .gauge svg{width:100%;height:100%;transform:rotate(-90deg)}
 .gauge circle{fill:none;stroke-width:14}
 .gauge .tr{stroke:var(--line)}.gauge .fl{stroke:var(--soc);stroke-linecap:round;transition:stroke-dashoffset .6s}
 .gc{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
-.gc b{font:600 44px/1 var(--num)}.gc span{color:var(--mute);font-size:13px}
+.gc b{font:600 36px/1 var(--num)}.gc span{color:var(--mute);font-size:13px}
 .pw{font:600 54px/1 var(--num);letter-spacing:-1px}
 .pw small{font-size:20px;color:var(--mute);margin-left:4px}
 .dir{font-size:14px;font-weight:600;margin-bottom:6px}
@@ -42,6 +42,8 @@ button:focus-visible{outline:2px solid var(--soc);outline-offset:2px}
 .kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-top:16px}
 .kv div{border-left:3px solid var(--line);padding-left:10px}
 .kv b{display:block;font:600 18px var(--num)}.kv span{color:var(--mute);font-size:12.5px}
+.gauge .fl{stroke-dasharray:502.7;stroke-dashoffset:502.7}.gauge.r .fl{stroke:var(--chg)}
+#kpa{width:70px;font:600 18px var(--num);background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:2px 6px}
 canvas{width:100%;height:220px;display:block}
 .leg{display:flex;gap:14px;font-size:13px;color:var(--mute);margin-top:8px}
 .leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px}
@@ -55,7 +57,7 @@ canvas{width:100%;height:220px;display:block}
 .rows div:last-child{border:0}.rows b{font-family:var(--num);font-weight:600}.rows span{color:var(--mute)}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .g2 .card{margin:0}
-@media(max-width:700px){.hero{grid-template-columns:1fr}.g2{grid-template-columns:1fr}.g2 .card{margin-bottom:14px}.pw{font-size:44px}}
+@media(max-width:700px){.hero{grid-template-columns:1fr 1fr}.hero>div:last-child{grid-column:1/-1}.g2{grid-template-columns:1fr}.g2 .card{margin-bottom:14px}.pw{font-size:44px}}
 @media(prefers-reduced-motion:reduce){.gauge .fl{transition:none}}
 </style>
 </head>
@@ -77,6 +79,10 @@ canvas{width:100%;height:220px;display:block}
       <svg viewBox="0 0 180 180"><circle class="tr" cx="90" cy="90" r="80"/><circle class="fl" id="gf" cx="90" cy="90" r="80"/></svg>
       <div class="gc"><b id="soc">--</b><span>State of charge</span></div>
     </div>
+    <div class="gauge r">
+      <svg viewBox="0 0 180 180"><circle class="tr" cx="90" cy="90" r="80"/><circle class="fl" id="rf" cx="90" cy="90" r="80"/></svg>
+      <div class="gc"><b id="rng">--</b><span>Range (km)</span></div>
+    </div>
     <div>
       <div class="dir" id="dir">--</div>
       <div class="pw"><span id="pw">--</span><small>W</small></div>
@@ -85,6 +91,7 @@ canvas{width:100%;height:220px;display:block}
         <div><b id="a">--</b><span>Current (A)</span></div>
         <div><b id="rem">--</b><span>Remaining (Ah)</span></div>
         <div><b id="dl">--</b><span>Cell difference (mV)</span></div>
+        <div><b><input id="kpa" type="number" inputmode="decimal" step="0.1" min="0.1" value="3"></b><span>km per Ah (range)</span></div>
       </div>
     </div>
   </div>
@@ -128,7 +135,9 @@ function render(s){
   $('pw').textContent=Math.abs(p).toFixed(0);
   const d=$('dir');d.textContent=s.a>.5?'Charging':s.a<-.5?'Discharging':'Idle';d.className='dir '+(s.a>.5?'chg':s.a<-.5?'dis':'');
   $('v').textContent=s.total.toFixed(2);$('a').textContent=s.a.toFixed(1);
-  $('rem').textContent=s.rem.toFixed(1);$('dl').textContent=Math.round((s.mx-s.mn)*1000);
+  $('rem').textContent=s.rem.toFixed(1);window.lastS=s;
+  const kpa=parseFloat($('kpa').value)||0,rk=s.rem*kpa,fk=s.nom*kpa;
+  $('rng').textContent=Math.round(rk);$('rf').style.strokeDasharray=2*Math.PI*80;$('rf').style.strokeDashoffset=2*Math.PI*80*(1-(fk>0?Math.min(1,rk/fk):0));$('dl').textContent=Math.round((s.mx-s.mn)*1000);
   const T=s.T;
   $('tm').textContent=T[0].toFixed(1)+' °C';$('t1').textContent=T[1].toFixed(1)+' °C';$('t2').textContent=T[2].toFixed(1)+' °C';
   $('bs').textContent=s.bal?'Balancing':'Off';
@@ -164,7 +173,10 @@ document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('nav button').forEach(o=>o.setAttribute('aria-selected',o===b));
   document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.id===b.dataset.t));draw()});
 addEventListener('resize',draw);
-addEventListener('load',()=>{setStatus('Not connected',false);draw()});
+addEventListener('load',()=>{
+  try{const k=localStorage.getItem('kpa');if(k)$('kpa').value=k}catch(e){}
+  $('kpa').addEventListener('input',()=>{try{localStorage.setItem('kpa',$('kpa').value)}catch(e){}if(window.lastS)render(window.lastS)});
+  setStatus('Not connected',false);draw()});
 
 /* ---------- real BMS over Web Bluetooth (JK02 protocol, 32-cell layout) ---------- */
 const SVC='0000ffe0-0000-1000-8000-00805f9b34fb',CHR='0000ffe1-0000-1000-8000-00805f9b34fb';
